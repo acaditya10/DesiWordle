@@ -1,0 +1,78 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Best Word Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              dark: {
+                bg: '#121212',
+                surface: '#1e1e1e',
+                primary: '#bb86fc',
+                secondary: '#03dac6',
+                text: '#e0e0e0',
+                'correct': '#538d4e',
+                'misplaced': '#b59f3b',
+                'incorrect': '#3a3a3c'
+              },
+              light: {
+                bg: '#f5f5f5',
+                surface: '#ffffff',
+                primary: '#6200ee',
+                secondary: '#03dac6',
+                text: '#121212',
+                'correct': '#6aaa64',
+                'misplaced': '#c9b458',
+                'incorrect': '#787c7e'
+              }
+            },
+            keyframes: {
+              'pop-in': {
+                '0%': { transform: 'scale(0.8)', opacity: '0' },
+                '40%': { transform: 'scale(1.1)', opacity: '1' },
+                '100%': { transform: 'scale(1)', opacity: '1' },
+              },
+              'shake': {
+                '0%, 100%': { transform: 'translateX(0)' },
+                '10%, 30%, 50%, 70%, 90%': { transform: 'translateX(-5px)' },
+                '20%, 40%, 60%, 80%': { transform: 'translateX(5px)' },
+              },
+              'flip-in': {
+                '0%': { transform: 'rotateX(0deg)' },
+                '50%': { transform: 'rotateX(-90deg)' },
+                '100%': { transform: 'rotateX(0deg)' },
+              }
+            },
+            animation: {
+              'pop-in': 'pop-in 0.2s ease-out',
+              'shake': 'shake 0.5s ease-in-out',
+              'flip-in': 'flip-in 0.5s ease-in-out'
+            }
+          }
+        }
+      }
+    </script>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.1"
+  }
+}
+</script>
+</head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

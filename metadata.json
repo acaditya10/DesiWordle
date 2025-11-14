@@ -1,0 +1,5 @@
+{
+  "name": "Desi Wordle",
+  "description": "A Wordle-style game where you have three attempts to guess a 5-letter word from a curated list of daily objects. The game provides a hint for the word, and features a dark/light mode toggle.",
+  "requestFramePermissions": []
+}
