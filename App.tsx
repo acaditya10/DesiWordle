@@ -7,13 +7,19 @@ import { Keyboard } from './components/Keyboard';
 import { GameModal } from './components/GameModal';
 import { Notification } from './components/Notification';
 import { Footer } from './components/Footer';
-import { LetterState, EvaluatedGuess, KeyStateMap } from './types';
+import { WelcomeModal } from './components/WelcomeModal';
+import { LeaderboardModal } from './components/LeaderboardModal';
+import { LetterState, EvaluatedGuess, KeyStateMap, LeaderboardEntry } from './types';
 
 const MAX_ATTEMPTS = 3;
 const WORD_LENGTH = 5;
 
 const App: React.FC = () => {
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const [userName, setUserName] = useState<string>('');
+  const [showWelcome, setShowWelcome] = useState(true);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  
   const [secretWord, setSecretWord] = useState<string>('');
   const [hint, setHint] = useState<string>('');
   const [guesses, setGuesses] = useState<EvaluatedGuess[]>([]);
@@ -27,6 +33,8 @@ const App: React.FC = () => {
   const [wins, setWins] = useState(0);
   const [losses, setLosses] = useState(0);
   const [streak, setStreak] = useState(0);
+  const [maxStreak, setMaxStreak] = useState(0);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
 
   useEffect(() => {
     if (isDarkMode) {
@@ -36,20 +44,53 @@ const App: React.FC = () => {
     }
   }, [isDarkMode]);
 
-  // Load stats from localStorage on initial load
+  // Initial game load
   useEffect(() => {
-    try {
-      const savedStats = localStorage.getItem('gameStats');
-      if (savedStats) {
-        const { wins, losses, streak } = JSON.parse(savedStats);
-        setWins(wins || 0);
-        setLosses(losses || 0);
-        setStreak(streak || 0);
-      }
-    } catch (error) {
-      console.error("Failed to parse stats from localStorage", error);
-    }
+    startNewGame();
+    // Load leaderboard initially
+    loadLeaderboard();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Load user stats when name is set
+  useEffect(() => {
+    if (userName) {
+      try {
+        const savedStats = localStorage.getItem(`stats_${userName}`);
+        if (savedStats) {
+          const { wins, losses, streak, maxStreak } = JSON.parse(savedStats);
+          setWins(wins || 0);
+          setLosses(losses || 0);
+          setStreak(streak || 0);
+          setMaxStreak(maxStreak || 0);
+        } else {
+          // Reset stats for new user
+          setWins(0);
+          setLosses(0);
+          setStreak(0);
+          setMaxStreak(0);
+        }
+      } catch (error) {
+        console.error("Failed to parse stats from localStorage", error);
+      }
+    }
+  }, [userName]);
+
+  const loadLeaderboard = () => {
+    try {
+      const savedLeaderboard = localStorage.getItem('desiWordle_leaderboard');
+      if (savedLeaderboard) {
+        setLeaderboard(JSON.parse(savedLeaderboard));
+      }
+    } catch (e) {
+      console.error("Failed to load leaderboard", e);
+    }
+  };
+
+  const handleUserWelcome = (name: string) => {
+    setUserName(name);
+    setShowWelcome(false);
+  };
 
   const startNewGame = useCallback(async () => {
     setGameState('LOADING');
@@ -62,18 +103,13 @@ const App: React.FC = () => {
     setGameState('PLAYING');
   }, []);
 
-  useEffect(() => {
-    startNewGame();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const showNotification = (message: string) => {
     setNotification(message);
     setTimeout(() => setNotification(''), 2000);
   };
 
   const handleKeyPress = useCallback((key: string) => {
-    if (gameState !== 'PLAYING') return;
+    if (gameState !== 'PLAYING' || showWelcome || showLeaderboard) return;
 
     if (key === 'Enter') {
       if (currentGuess.length !== WORD_LENGTH) {
@@ -88,7 +124,46 @@ const App: React.FC = () => {
     } else if (currentGuess.length < WORD_LENGTH && /^[A-Z]$/i.test(key)) {
       setCurrentGuess(prev => prev + key.toUpperCase());
     }
-  }, [currentGuess, gameState]);
+  }, [currentGuess, gameState, showWelcome, showLeaderboard]);
+
+  const updateLeaderboard = (newWins: number, newMaxStreak: number) => {
+    try {
+      let entries: LeaderboardEntry[] = [];
+      const saved = localStorage.getItem('desiWordle_leaderboard');
+      if (saved) entries = JSON.parse(saved);
+
+      const existingIndex = entries.findIndex(e => e.name === userName);
+      const entry: LeaderboardEntry = {
+        name: userName,
+        wins: newWins,
+        maxStreak: newMaxStreak,
+        lastPlayed: Date.now()
+      };
+
+      if (existingIndex >= 0) {
+        entries[existingIndex] = { 
+            ...entries[existingIndex], 
+            ...entry,
+            // Keep the absolute best max streak if for some reason local state is lower (unlikely)
+            maxStreak: Math.max(entries[existingIndex].maxStreak, newMaxStreak),
+            wins: newWins
+        };
+      } else {
+        entries.push(entry);
+      }
+
+      // Sort by Max Streak descending
+      entries.sort((a, b) => b.maxStreak - a.maxStreak);
+      
+      // Keep top 10
+      const top10 = entries.slice(0, 10);
+      
+      localStorage.setItem('desiWordle_leaderboard', JSON.stringify(top10));
+      setLeaderboard(top10);
+    } catch (e) {
+      console.error("Failed to update leaderboard", e);
+    }
+  };
 
   const submitGuess = () => {
     const evaluation = evaluateGuess(currentGuess, secretWord);
@@ -107,24 +182,38 @@ const App: React.FC = () => {
       }
     });
     setKeyStates(newKeyStates);
-    
     setCurrentGuess('');
 
     if (currentGuess === secretWord) {
       setTimeout(() => {
         const newWins = wins + 1;
         const newStreak = streak + 1;
+        const newMaxStreak = Math.max(newStreak, maxStreak);
+        
         setWins(newWins);
         setStreak(newStreak);
-        localStorage.setItem('gameStats', JSON.stringify({ wins: newWins, losses, streak: newStreak }));
+        setMaxStreak(newMaxStreak);
+        
+        const stats = { wins: newWins, losses, streak: newStreak, maxStreak: newMaxStreak };
+        localStorage.setItem(`stats_${userName}`, JSON.stringify(stats));
+        updateLeaderboard(newWins, newMaxStreak);
+        
         setGameState('WON');
       }, 500);
     } else if (newGuesses.length === MAX_ATTEMPTS) {
       setTimeout(() => {
         const newLosses = losses + 1;
+        const newStreak = 0;
+        // Max streak remains same
+        
         setLosses(newLosses);
-        setStreak(0);
-        localStorage.setItem('gameStats', JSON.stringify({ wins, losses: newLosses, streak: 0 }));
+        setStreak(newStreak);
+        
+        const stats = { wins, losses: newLosses, streak: newStreak, maxStreak };
+        localStorage.setItem(`stats_${userName}`, JSON.stringify(stats));
+        // Still update leaderboard to reflect lastPlayed or wins if needed (though wins didnt change)
+        updateLeaderboard(wins, maxStreak);
+        
         setGameState('LOST');
       }, 500);
     }
@@ -167,16 +256,29 @@ const App: React.FC = () => {
 
   return (
     <div className="bg-light-bg dark:bg-dark-bg text-light-text dark:text-dark-text min-h-screen flex flex-col font-sans transition-colors duration-300">
+      {showWelcome && <WelcomeModal onComplete={handleUserWelcome} />}
+      
+      <LeaderboardModal 
+        isOpen={showLeaderboard} 
+        onClose={() => setShowLeaderboard(false)} 
+        entries={leaderboard}
+        currentUserName={userName}
+      />
+
       <Notification message={notification} />
       
       <div className="w-full">
-        <Header isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} />
-        <ScoreBoard wins={wins} losses={losses} streak={streak} />
+        <Header 
+          isDarkMode={isDarkMode} 
+          setIsDarkMode={setIsDarkMode} 
+          onOpenLeaderboard={() => setShowLeaderboard(true)}
+        />
+        <ScoreBoard wins={wins} losses={losses} streak={streak} maxStreak={maxStreak} />
       </div>
       
       <main className="flex flex-col items-center justify-center flex-grow w-full px-2 sm:px-4">
         {gameState === 'LOADING' ? (
-          <div className="text-2xl font-semibold animate-pulse">Loading a new word...</div>
+          <div className="text-2xl font-semibold animate-pulse mt-10">Loading a new word...</div>
         ) : (
           <>
             <div className="text-center mb-4 p-4 rounded-lg bg-light-surface dark:bg-dark-surface shadow-md max-w-md w-full">
@@ -195,7 +297,7 @@ const App: React.FC = () => {
       </main>
 
       <div className="w-full flex flex-col items-center">
-        {gameState !== 'LOADING' && (
+        {gameState !== 'LOADING' && !showWelcome && (
           <Keyboard onKeyPress={handleKeyPress} keyStates={keyStates} />
         )}
         <Footer />
@@ -205,8 +307,9 @@ const App: React.FC = () => {
         <GameModal 
           gameState={gameState} 
           secretWord={secretWord} 
-          attempts={guesses.length}
+          guesses={guesses}
           onPlayAgain={startNewGame}
+          isDarkMode={isDarkMode}
         />
       )}
     </div>

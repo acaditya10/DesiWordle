@@ -12,3 +12,10 @@ export interface EvaluatedGuess {
 }
 
 export type KeyStateMap = { [key: string]: LetterState };
+
+export interface LeaderboardEntry {
+  name: string;
+  maxStreak: number;
+  wins: number;
+  lastPlayed: number;
+}
